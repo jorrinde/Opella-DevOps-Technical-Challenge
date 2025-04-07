@@ -1,6 +1,6 @@
-# main.tf
+# modules/vnet/main.tf
 
-resource "azurerm_virtual_network" "main" {
+resource "vnet" "main" {
   name                = var.vnet_name
   location            = var.location
   resource_group_name = var.resource_group_name
@@ -18,13 +18,13 @@ resource "azurerm_virtual_network" "main" {
   tags = var.tags
 }
 
-resource "azurerm_subnet" "main" {
-  # Crear una subred por cada entrada en el mapa var.subnets
+resource "azure_subnet" "main" {
+  # Crear una subred por cada entrada en var.subnets
   for_each = var.subnets
 
   name                 = each.value.name
   resource_group_name  = var.resource_group_name
-  virtual_network_name = azurerm_virtual_network.main.name
+  virtual_network_name = vnet.main.name
   address_prefixes     = each.value.address_prefixes
   service_endpoints    = lookup(each.value, "service_endpoints", []) 
 
@@ -43,7 +43,6 @@ resource "azurerm_subnet" "main" {
     }
   }
 
-  # Asociaciones condicionales directamente en la subred
   network_security_group_id = lookup(each.value, "network_security_group_id", null)
   route_table_id            = lookup(each.value, "route_table_id", null)
 }

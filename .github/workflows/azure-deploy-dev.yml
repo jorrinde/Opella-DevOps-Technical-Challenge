@@ -1,0 +1,66 @@
+name: Deploy Dev Environment to Azure
+
+on:
+  push:
+    branches:
+      - main # Rama de desarrollo
+    paths:
+      - 'terraform/environments/dev/**' 
+      - 'terraform/modules/**'       
+      - '.github/workflows/azure-deploy-dev.yml' 
+  workflow_dispatch: true # Permite ejecución manual
+
+env:
+  TF_VAR_environment: dev # Pasa variables a Terraform
+  WORKING_DIRECTORY: ./terraform/environments/dev # Directorio de trabajo para Terraform
+
+jobs:
+  terraform:
+    name: Terraform Plan and Apply (Dev)
+    runs-on: ubuntu-latest
+    environment: development
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: latest 
+
+      - name: Terraform Init
+        id: init
+        run: |
+          terraform init \
+            -backend-config="key=${{ secrets.ARM_ACCESS_KEY }}" \
+            -backend-config="resource_group_name=${{ secrets.TF_BACKEND_RESOURCE_GROUP }}"
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        env:
+          ARM_ACCESS_KEY: ${{ secrets.ARM_ACCESS_KEY }}
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -no-color -var-file=terraform.tfvars -out=tfplan
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}    
+
+      - name: Terraform Apply
+        id: apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: terraform apply -auto-approve tfplan
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
